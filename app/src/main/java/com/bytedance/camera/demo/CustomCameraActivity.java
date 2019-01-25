@@ -1,6 +1,7 @@
 package com.bytedance.camera.demo;
 
 import android.hardware.Camera;
+import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
@@ -11,12 +12,15 @@ import android.view.SurfaceView;
 import android.view.Window;
 import android.view.WindowManager;
 
+import com.bytedance.camera.demo.utils.Utils;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
 
 import static com.bytedance.camera.demo.utils.Utils.MEDIA_TYPE_IMAGE;
+import static com.bytedance.camera.demo.utils.Utils.MEDIA_TYPE_VIDEO;
 import static com.bytedance.camera.demo.utils.Utils.getOutputMediaFile;
 
 public class CustomCameraActivity extends AppCompatActivity implements SurfaceHolder.Callback {
@@ -40,18 +44,46 @@ public class CustomCameraActivity extends AppCompatActivity implements SurfaceHo
 
         mSurfaceView = findViewById(R.id.img);
         //todo 给SurfaceHolder添加Callback
+        mCamera=getCamera(Camera.CameraInfo.CAMERA_FACING_BACK);
+        SurfaceHolder surfaceHolder = mSurfaceView.getHolder();
+        surfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+        surfaceHolder.addCallback(new SurfaceHolder.Callback() {
+            @Override
+            public void surfaceCreated(SurfaceHolder holder) {
+                try {
+                    mCamera.setPreviewDisplay(holder);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                mCamera.startPreview();
+            }
+
+            @Override
+            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+            }
+
+            @Override
+            public void surfaceDestroyed(SurfaceHolder holder) {
+                mCamera.stopPreview();
+                mCamera.release();
+                mCamera=null;
+            }
+        });
 
         findViewById(R.id.btn_picture).setOnClickListener(v -> {
             //todo 拍一张照片
+            mCamera.takePicture(null,null,mPicture);
         });
 
         findViewById(R.id.btn_record).setOnClickListener(v -> {
             //todo 录制，第一次点击是start，第二次点击是stop
             if (isRecording) {
                 //todo 停止录制
-                isRecording = false;
+                surfaceDestroyed(surfaceHolder);
+                isRecording=false;
             } else {
                 //todo 录制
+                prepareVideoRecorder();
             }
         });
 
@@ -119,6 +151,7 @@ public class CustomCameraActivity extends AppCompatActivity implements SurfaceHo
 
     private void releaseCameraAndPreview() {
         //todo 释放camera资源
+        mCamera.lock();
     }
 
     Camera.Size size;
@@ -132,13 +165,31 @@ public class CustomCameraActivity extends AppCompatActivity implements SurfaceHo
 
     private boolean prepareVideoRecorder() {
         //todo 准备MediaRecorder
-
+        mCamera.unlock();
+        mMediaRecorder.setCamera(mCamera);
+        mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.CAMCORDER);
+        mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
+        mMediaRecorder.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH));
+        mMediaRecorder.setOutputFile(getOutputMediaFile(MEDIA_TYPE_VIDEO).toString());
+        mMediaRecorder.setPreviewDisplay(mSurfaceView.getHolder().getSurface());
+        mMediaRecorder.setOrientationHint(rotationDegree);
+        try {
+            mMediaRecorder.prepare();
+            mMediaRecorder.start();
+        }catch (Exception e){
+            releaseMediaRecorder();
+            return false;
+        }
         return true;
     }
 
 
     private void releaseMediaRecorder() {
         //todo 释放MediaRecorder
+        mMediaRecorder.stop();
+        mMediaRecorder.reset();
+        mMediaRecorder.release();
+        mMediaRecorder=null;
     }
 
     @Override
@@ -153,6 +204,11 @@ public class CustomCameraActivity extends AppCompatActivity implements SurfaceHo
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
         //todo 释放Camera和MediaRecorder资源
+        mMediaRecorder.stop();
+        mMediaRecorder.reset();
+        mMediaRecorder.release();
+        mMediaRecorder=null;
+        mCamera.lock();
     }
 
 

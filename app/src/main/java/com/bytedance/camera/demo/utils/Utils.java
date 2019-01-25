@@ -126,9 +126,9 @@ public class Utils {
     }
 
 
-    private static final int NUM_90 = 90;
-    private static final int NUM_180 = 180;
-    private static final int NUM_270 = 270;
+    public static final int NUM_90 = 90;
+    public static final int NUM_180 = 180;
+    public static final int NUM_270 = 270;
 
     public static  Bitmap rotateImage(Bitmap bitmap, String path) {
         ExifInterface srcExif = null;
